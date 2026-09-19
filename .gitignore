@@ -10,16 +10,22 @@ node_modules/
 # Python
 __pycache__/
 *.py[cod]
-.venv/
 venv/
-**/.venv/
+.venv/
 **/venv/
+**/.venv/
 
-# Build outputs
+# Build files
 dist/
 build/
 **/dist/
 **/build/
+
+# ML files
+api/model/
+*.joblib
+*.pkl
+*.csv
 
 # Logs
 *.log
@@ -34,15 +40,3 @@ pnpm-debug.log*
 # OS
 .DS_Store
 Thumbs.db
-
-# Python/Flask
-.pytest_cache/
-.mypy_cache/
-
-# Temporary files
-*.tmp
-*.temp
-
-# ML datasets and models
-api/model/*.csv
-api/model/*.joblib
