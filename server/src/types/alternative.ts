@@ -12,6 +12,7 @@ export interface AlternativeMedicineInput {
 export interface AlternativeResult {
   medicine: AlternativeMedicineInput;
   similarity: number;
+  matchStrength: "Strong match" | "Good match" | "Moderate match" | "Limited match";
   reason: string;
 }
 

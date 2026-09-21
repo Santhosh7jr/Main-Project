@@ -15,6 +15,7 @@ export interface FlaskPredictRequest {
 export interface FlaskPredictedADR {
   adr: string;
   score: number;
+  likelihood?: "Low" | "Moderate" | "High";
 }
 
 export interface FlaskPredictionData {

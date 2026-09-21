@@ -30,9 +30,8 @@ export interface RiskBucket {
 export interface ReportSummary {
   totalPatients: number;
   totalAssessments: number;
-  highRiskCases: number;
-  moderateRiskCases: number;
-  lowRiskCases: number;
-  riskDistribution: RiskBucket[];
+  medicinesReviewed: number;
+  adrsIdentified: number;
+  assessmentsThisWeek: number;
   recentAssessments: ReportAssessment[];
 }

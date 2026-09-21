@@ -47,8 +47,8 @@ export interface FlaskPatientContext {
 
 export interface FlaskADR {
   adr: string;
-
   score: number;
+  likelihood?: "Low" | "Moderate" | "High";
 }
 
 

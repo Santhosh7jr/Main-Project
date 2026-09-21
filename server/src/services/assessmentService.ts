@@ -49,7 +49,7 @@ export interface AssessmentResult {
 
   prediction: {
     medicineText: string;
-    predictedADRs: { adr: string; score: number }[];
+    predictedADRs: { adr: string; score: number; likelihood: "Low" | "Moderate" | "High" }[];
     threshold: number;
     topScores: { adr: string; score: number }[];
   };
@@ -58,6 +58,7 @@ export interface AssessmentResult {
     adr: string;
     score: number;
     probability: number | null;
+    likelihood: "Low" | "Moderate" | "High";
   }[];
 
   patientSafety: FlaskPatientSafetyData;
@@ -66,23 +67,40 @@ export interface AssessmentResult {
 }
 
 const calculateRisk = (
-  predictions: { adr: string; score: number }[],
+  predictions: {
+    adr: string;
+    score: number;
+    likelihood: "Low" | "Moderate" | "High";
+  }[],
 ) => {
   if (predictions.length === 0) {
     return { riskLevel: "Low", confidence: 0 };
   }
 
   const highestScore = predictions[0].score;
+  const highCount = predictions.filter(
+    (item) => item.likelihood === "High",
+  ).length;
+  const moderateCount = predictions.filter(
+    (item) => item.likelihood === "Moderate",
+  ).length;
 
   let riskLevel = "Low";
-  if (highestScore >= 0.8) {
+
+  if (highCount >= 2 || highestScore >= 1.5) {
     riskLevel = "High";
-  } else if (highestScore >= 0.5) {
+  } else if (
+    highCount >= 1 ||
+    moderateCount >= 2 ||
+    highestScore >= 0.5
+  ) {
     riskLevel = "Moderate";
   }
 
+  // The SVM decision score is not a calibrated probability.
+  // This bounded value is only a UI/model-strength indicator.
   const confidence = Number(
-    Math.min(Math.max(highestScore, 0), 1).toFixed(6),
+    (1 / (1 + Math.exp(-highestScore))).toFixed(6),
   );
 
   return { riskLevel, confidence };
@@ -285,11 +303,26 @@ export const evaluateAssessment = async ({
     }
 
     const predictions = mlResult.data.predictedADRs
-      .map((prediction) => ({
-        adr: String(prediction.adr ?? "").trim(),
-        score: Number(prediction.score),
-        probability: null,
-      }))
+      .map((prediction) => {
+        const score = Number(prediction.score);
+        const likelihood =
+          prediction.likelihood === "High" ||
+          prediction.likelihood === "Moderate" ||
+          prediction.likelihood === "Low"
+            ? prediction.likelihood
+            : score >= 1
+              ? "High"
+              : score >= 0.5
+                ? "Moderate"
+                : "Low";
+
+        return {
+          adr: String(prediction.adr ?? "").trim(),
+          score,
+          probability: null,
+          likelihood,
+        };
+      })
       .filter(
         (prediction) =>
           prediction.adr.length > 0 &&
@@ -334,6 +367,7 @@ export const evaluateAssessment = async ({
           (prediction) => ({
             adr: prediction.adr,
             score: prediction.score,
+            likelihood: prediction.likelihood,
           }),
         ),
         threshold: mlResult.data.threshold,

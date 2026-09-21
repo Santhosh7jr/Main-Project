@@ -30,10 +30,9 @@ export interface RiskBucket {
 export interface ReportSummary {
   totalPatients: number;
   totalAssessments: number;
-  highRiskCases: number;
-  moderateRiskCases: number;
-  lowRiskCases: number;
-  riskDistribution: RiskBucket[];
+  medicinesReviewed: number;
+  adrsIdentified: number;
+  assessmentsThisWeek: number;
   recentAssessments: ReportAssessment[];
 }
 
@@ -130,39 +129,39 @@ export const readReportSummary = async (
   const [
     patientResult,
     assessmentResult,
-    riskResult,
+    medicinesResult,
+    adrResult,
+    weekResult,
     recentResult,
   ] = await Promise.all([
     pool.query(
-      `
-      SELECT COUNT(*)::int AS count
-      FROM patients
-      WHERE doctor_id = $1
-      `,
+      `SELECT COUNT(*)::int AS count FROM patients WHERE doctor_id = $1`,
       [doctorId],
     ),
     pool.query(
-      `
-      SELECT COUNT(*)::int AS count
-      FROM assessments
-      WHERE doctor_id = $1
-      `,
+      `SELECT COUNT(*)::int AS count FROM assessments WHERE doctor_id = $1`,
       [doctorId],
     ),
     pool.query(
-      `
-      SELECT
-        COALESCE(risk_level, 'Low') AS "riskLevel",
-        COUNT(*)::int AS count
-      FROM assessments
-      WHERE doctor_id = $1
-      GROUP BY COALESCE(risk_level, 'Low')
-      `,
+      `SELECT COUNT(DISTINCT medicine_id)::int AS count FROM assessments WHERE doctor_id = $1`,
       [doctorId],
     ),
     pool.query(
-      `
-      SELECT
+      `SELECT COUNT(aa.id)::int AS count
+       FROM assessment_adrs aa
+       INNER JOIN assessments a ON a.id = aa.assessment_id
+       WHERE a.doctor_id = $1`,
+      [doctorId],
+    ),
+    pool.query(
+      `SELECT COUNT(*)::int AS count
+       FROM assessments
+       WHERE doctor_id = $1
+         AND created_at >= NOW() - INTERVAL '7 days'`,
+      [doctorId],
+    ),
+    pool.query(
+      `SELECT
         a.id,
         p.id AS "patientId",
         p.name AS "patientName",
@@ -172,77 +171,24 @@ export const readReportSummary = async (
         COALESCE(a.confidence, 0)::float AS confidence,
         a.created_at AS "createdAt",
         COUNT(aa.id)::int AS "adrCount"
-      FROM assessments a
-      JOIN patients p
-        ON p.id = a.patient_id
-      JOIN medicines m
-        ON m.id = a.medicine_id
-      LEFT JOIN assessment_adrs aa
-        ON aa.assessment_id = a.id
-      WHERE a.doctor_id = $1
-      GROUP BY
-        a.id,
-        p.id,
-        p.name,
-        m.id,
-        m.name,
-        a.risk_level,
-        a.confidence,
-        a.created_at
-      ORDER BY a.created_at DESC
-      LIMIT 5
-      `,
+       FROM assessments a
+       JOIN patients p ON p.id = a.patient_id
+       JOIN medicines m ON m.id = a.medicine_id
+       LEFT JOIN assessment_adrs aa ON aa.assessment_id = a.id
+       WHERE a.doctor_id = $1
+       GROUP BY a.id, p.id, p.name, m.id, m.name, a.risk_level, a.confidence, a.created_at
+       ORDER BY a.created_at DESC
+       LIMIT 6`,
       [doctorId],
     ),
   ]);
 
-  const totalPatients =
-    toCount(patientResult.rows[0]?.count);
-
-  const totalAssessments =
-    toCount(assessmentResult.rows[0]?.count);
-
-  const riskCounts =
-    new Map<RiskLevel, number>([
-      ["Low", 0],
-      ["Moderate", 0],
-      ["High", 0],
-    ]);
-
-  for (const row of riskResult.rows) {
-    riskCounts.set(
-      normalizeRiskLevel(row.riskLevel),
-      toCount(row.count),
-    );
-  }
-
-  const riskDistribution:
-    RiskBucket[] = [
-      "Low",
-      "Moderate",
-      "High",
-    ].map((riskLevel) => ({
-      riskLevel:
-        riskLevel as RiskLevel,
-      count:
-        riskCounts.get(
-          riskLevel as RiskLevel,
-        ) ?? 0,
-    }));
-
   return {
-    totalPatients,
-    totalAssessments,
-    highRiskCases:
-      riskCounts.get("High") ?? 0,
-    moderateRiskCases:
-      riskCounts.get("Moderate") ?? 0,
-    lowRiskCases:
-      riskCounts.get("Low") ?? 0,
-    riskDistribution,
-    recentAssessments:
-      recentResult.rows.map(
-        mapAssessmentRow,
-      ),
+    totalPatients: toCount(patientResult.rows[0]?.count),
+    totalAssessments: toCount(assessmentResult.rows[0]?.count),
+    medicinesReviewed: toCount(medicinesResult.rows[0]?.count),
+    adrsIdentified: toCount(adrResult.rows[0]?.count),
+    assessmentsThisWeek: toCount(weekResult.rows[0]?.count),
+    recentAssessments: recentResult.rows.map(mapAssessmentRow),
   };
 };

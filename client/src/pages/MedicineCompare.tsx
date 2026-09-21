@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 
 import {
   ArrowLeftRight,
@@ -14,6 +15,7 @@ import {
 
 import {
   compareMedicines,
+  getMedicineById,
   searchMedicines,
 } from "../services/medicineService.js";
 
@@ -347,6 +349,7 @@ function ComparisonListSection({
 // ============================================================
 
 export default function MedicineCompare() {
+  const [searchParams] = useSearchParams();
   const [medicine1, setMedicine1] =
     useState<Medicine | null>(null);
 
@@ -363,6 +366,42 @@ export default function MedicineCompare() {
 
   const [error, setError] =
     useState<string | null>(null);
+
+  // Load a comparison pair passed from the assessment page.
+  useEffect(() => {
+    const firstId = Number(searchParams.get("medicine1"));
+    const secondId = Number(searchParams.get("medicine2"));
+
+    if (!Number.isInteger(firstId) || !Number.isInteger(secondId) || firstId <= 0 || secondId <= 0 || firstId === secondId) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadComparisonPair = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const [first, second] = await Promise.all([
+          getMedicineById(firstId),
+          getMedicineById(secondId),
+        ]);
+        if (cancelled) return;
+        setMedicine1(first);
+        setMedicine2(second);
+        setComparison(null);
+      } catch (error) {
+        if (!cancelled) {
+          setError(error instanceof Error ? error.message : "Failed to load medicines for comparison.");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    void loadComparisonPair();
+    return () => { cancelled = true; };
+  }, [searchParams]);
 
   // ==========================================================
   // Compare

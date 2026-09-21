@@ -15,6 +15,7 @@ export interface AlternativeResult {
   medicine: AlternativeMedicine;
   similarity: number;
   reason: string;
+  matchLevel?: string;
 }
 
 export interface AlternativesResponse {

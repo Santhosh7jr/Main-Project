@@ -16,6 +16,7 @@ export type { Medicine } from "./medicine";
 export interface PredictedADR {
   adr: string;
   score: number;
+  likelihood: "Low" | "Moderate" | "High";
 }
 
 export interface AssessmentResult {

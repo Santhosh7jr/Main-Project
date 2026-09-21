@@ -14,6 +14,7 @@ export interface AssessmentPrediction {
     adr: string;
 
     score: number;
+    likelihood: "Low" | "Moderate" | "High";
   }[];
 
   threshold: number;

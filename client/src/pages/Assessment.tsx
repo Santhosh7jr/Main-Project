@@ -864,6 +864,9 @@ function Assessment() {
 
               <Alternatives
                 alternatives={alternatives}
+                selectedMedicineId={
+                  assessmentData.medicine.id
+                }
                 onSelectAlternative={
                   handleAlternativeSelect
                 }

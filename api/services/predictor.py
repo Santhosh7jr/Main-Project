@@ -167,6 +167,24 @@ class ADRPredictor:
         return " ".join(parts)
 
 
+
+    @staticmethod
+    def score_to_likelihood(score):
+        """
+        Convert the trained SVM decision score into a simple
+        human-readable model-likelihood band. The underlying
+        score is NOT a calibrated medical probability.
+
+        The model threshold is 0.30. Scores are therefore
+        presented as: 0.30-0.49 Low, 0.50-0.99 Moderate,
+        and >=1.00 High.
+        """
+        if score >= 1.0:
+            return "High"
+        if score >= 0.5:
+            return "Moderate"
+        return "Low"
+
     def predict(self, medicine):
 
         medicine_text = (
@@ -288,7 +306,8 @@ class ADRPredictor:
                     "adr": str(
                         self.classes[index]
                     ),
-                    "score": float(score)
+                    "score": float(score),
+                    "likelihood": self.score_to_likelihood(float(score))
                 })
 
         print(
