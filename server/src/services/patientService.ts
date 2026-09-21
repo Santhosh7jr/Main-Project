@@ -38,7 +38,9 @@ export const getAllPatients = async (
           WHERE pa.allergy_name IS NOT NULL
         ),
         '{}'
-      ) AS allergies
+      ) AS allergies,
+
+      '[]'::json AS "assessmentHistory"
 
     FROM patients p
 
@@ -155,6 +157,102 @@ export const getPatientById = async (
       [patientId],
     );
 
+  // --------------------------------------------------
+  // Finalized ADR assessment history
+  // --------------------------------------------------
+  //
+  // IMPORTANT:
+  // Only finalized assessments are returned here.
+  // Preview runs never reach this table.
+  // --------------------------------------------------
+
+  const assessmentHistoryResult =
+    await pool.query(
+      `
+      SELECT
+        a.id,
+        a.created_at AS "createdAt",
+
+        COALESCE(
+          a.patient_name_snapshot,
+          p.name
+        ) AS "patientName",
+
+        COALESCE(
+          a.patient_age_snapshot,
+          p.age
+        )::int AS "patientAge",
+
+        COALESCE(
+          a.patient_gender_snapshot,
+          p.gender
+        ) AS "patientGender",
+
+        COALESCE(
+          a.patient_conditions_snapshot,
+          '[]'::jsonb
+        ) AS "patientConditions",
+
+        COALESCE(
+          a.patient_allergies_snapshot,
+          '[]'::jsonb
+        ) AS "patientAllergies",
+
+        a.medicine_id AS "medicineId",
+        m.name AS "medicineName",
+        m.generic_name AS "genericName",
+        m.therapeutic_class AS "therapeuticClass",
+        m.action_class AS "actionClass",
+        m.chemical_class AS "chemicalClass",
+        m.habit_forming AS "habitForming",
+
+        COALESCE(a.risk_level, 'Low') AS "riskLevel",
+        COALESCE(a.confidence, 0)::float AS confidence,
+
+        COALESCE(
+          JSON_AGG(
+            JSON_BUILD_OBJECT(
+              'adr', aa.adr_name,
+              'score', aa.score::float,
+              'probability', aa.probability::float
+            )
+            ORDER BY aa.score DESC NULLS LAST
+          ) FILTER (WHERE aa.id IS NOT NULL),
+          '[]'::json
+        ) AS predictions
+
+      FROM assessments a
+
+      JOIN patients p
+        ON p.id = a.patient_id
+
+      JOIN medicines m
+        ON m.id = a.medicine_id
+
+      LEFT JOIN assessment_adrs aa
+        ON aa.assessment_id = a.id
+
+      WHERE a.patient_id = $1
+
+      GROUP BY
+        a.id,
+        p.id,
+        p.name,
+        p.age,
+        p.gender,
+        m.id,
+        m.name,
+        m.generic_name,
+        m.therapeutic_class,
+        m.action_class,
+        m.chemical_class,
+        m.habit_forming
+
+      ORDER BY a.created_at DESC
+      `,
+      [patientId],
+    );
+
   return {
     ...patient,
 
@@ -170,6 +268,9 @@ export const getPatientById = async (
 
     medications:
       medicationsResult.rows,
+
+    assessmentHistory:
+      assessmentHistoryResult.rows,
   };
 };
 

@@ -14,6 +14,33 @@ export interface PatientMedication {
   endDate: string | null;
 }
 
+export interface PatientAssessmentHistory {
+  id: number;
+  createdAt: string;
+  patientName: string;
+  patientAge: number;
+  patientGender: "Male" | "Female" | "Other";
+  patientConditions: string[];
+  patientAllergies: string[];
+
+  medicineId: number;
+  medicineName: string;
+  genericName: string | null;
+  therapeuticClass: string | null;
+  actionClass: string | null;
+  chemicalClass: string | null;
+  habitForming: boolean;
+
+  riskLevel: "Low" | "Moderate" | "High";
+  confidence: number;
+
+  predictions: {
+    adr: string;
+    score: number | null;
+    probability: number | null;
+  }[];
+}
+
 export interface Patient {
   id: number;
 
@@ -37,6 +64,8 @@ export interface Patient {
   allergies: string[];
 
   medications: PatientMedication[];
+
+  assessmentHistory: PatientAssessmentHistory[];
 
   createdAt: string;
 }

@@ -5,28 +5,24 @@ import {
 } from "../middleware/authMiddleware.js";
 
 import {
+  previewAssessment,
   createAssessment,
 } from "../controllers/assessmentController.js";
 
 const router = Router();
 
-
-// ======================================================
-// All assessment routes require authentication
-// ======================================================
-
 router.use(requireAuth);
 
+// AI/safety analysis only. No database write.
+router.post(
+  "/preview",
+  previewAssessment,
+);
 
-// ======================================================
-// CREATE ASSESSMENT
-// POST /api/assessments
-// ======================================================
-
+// Explicit doctor selection. Creates history.
 router.post(
   "/",
   createAssessment,
 );
-
 
 export default router;

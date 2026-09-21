@@ -1,4 +1,5 @@
 import api from "./api";
+import type { Medicine } from "../types/medicine";
 
 
 // ======================================================
@@ -29,24 +30,7 @@ export interface AssessmentPrediction {
 // MEDICINE
 // ======================================================
 
-export interface AssessmentMedicine {
-
-  id: number;
-
-  name: string;
-
-  genericName: string | null;
-
-  therapeuticClass: string | null;
-
-  actionClass: string | null;
-
-  chemicalClass: string | null;
-
-  habitForming: boolean;
-
-  uses: string[];
-}
+export type AssessmentMedicine = Medicine;
 
 
 // ======================================================
@@ -140,9 +124,13 @@ export type RiskLevel =
 
 export interface AssessmentResponse {
 
-  assessmentId: number;
+  /**
+   * null while this is only a preview.
+   * A number is returned after the doctor saves the medicine.
+   */
+  assessmentId: number | null;
 
-  createdAt: string;
+  createdAt: string | null;
 
 
   patient: {
@@ -227,28 +215,47 @@ interface ApiResponse<T> {
 
 
 // ======================================================
-// RUN ASSESSMENT
+// PREVIEW ASSESSMENT
 // ======================================================
+//
+// Runs the AI/safety analysis only.
+// It DOES NOT save anything to the database.
+//
+export const runAssessment = async (
+  patientId: number,
+  medicineId: number,
+): Promise<AssessmentResponse> => {
+  const response =
+    await api.post<ApiResponse<AssessmentResponse>>(
+      "/assessments/preview",
+      {
+        patientId,
+        medicineId,
+      },
+    );
 
-export const runAssessment =
-  async (
-    patientId: number,
+  return response.data.data;
+};
 
-    medicineId: number,
-  ): Promise<AssessmentResponse> => {
+// ======================================================
+// SAVE SELECTED MEDICINE
+// ======================================================
+//
+// Call this only after the doctor explicitly decides
+// that this is the medicine to give the patient.
+//
+export const saveAssessment = async (
+  patientId: number,
+  medicineId: number,
+): Promise<AssessmentResponse> => {
+  const response =
+    await api.post<ApiResponse<AssessmentResponse>>(
+      "/assessments",
+      {
+        patientId,
+        medicineId,
+      },
+    );
 
-    const response =
-      await api.post<
-        ApiResponse<AssessmentResponse>
-      >(
-        "/assessments",
-        {
-          patientId,
-
-          medicineId,
-        },
-      );
-
-
-    return response.data.data;
-  };
+  return response.data.data;
+};

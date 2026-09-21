@@ -342,21 +342,16 @@ export default function Patients() {
           gender: formData.gender,
           phone:
             formData.phone.trim() ||
-            undefined,
+            null,
           email:
             formData.email.trim() ||
-            undefined,
+            null,
           bloodGroup:
             formData.bloodGroup.trim() ||
-            undefined,
-          conditions:
-            conditions.length > 0
-              ? conditions
-              : undefined,
-          allergies:
-            allergies.length > 0
-              ? allergies
-              : undefined,
+            null,
+          conditions,
+          allergies,
+          medications: [],
         });
 
       setPatients((previous) => [

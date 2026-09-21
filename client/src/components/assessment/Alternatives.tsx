@@ -8,10 +8,12 @@ import type { AlternativeResult } from "../../services/alternativeService";
 
 interface AlternativesProps {
   alternatives: AlternativeResult[];
+  onSelectAlternative: (medicineId: number) => void;
 }
 
 function Alternatives({
   alternatives,
+  onSelectAlternative,
 }: AlternativesProps) {
   return (
     <section>
@@ -174,10 +176,24 @@ function Alternatives({
                   </div>
                 )}
 
-                {/* Review indicator */}
-                <div className="mt-5 flex items-center gap-1.5 border-t border-slate-100 pt-4 text-xs text-slate-400">
-                  <ArrowRight size={13} />
-                  For clinician review and comparison
+                {/* Select alternative */}
+                <div className="mt-5 flex flex-col gap-3 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                    <ArrowRight size={13} />
+                    Review this medicine before selecting it
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onSelectAlternative(
+                        alternative.medicine.id
+                      )
+                    }
+                    className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-blue-700"
+                  >
+                    Assess & Select
+                  </button>
                 </div>
               </div>
             );

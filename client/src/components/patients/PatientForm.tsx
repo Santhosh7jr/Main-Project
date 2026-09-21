@@ -9,7 +9,7 @@ interface PatientFormProps {
   onSubmit: (
     patient: Omit<
       Patient,
-      "id" | "createdAt"
+      "id" | "createdAt" | "assessmentHistory"
     >
   ) => Promise<void>;
 }

@@ -8,17 +8,10 @@ export interface AssessmentPatient {
   medications: string[];
 }
 
-export interface Medicine {
-  id: number;
-  name: string;
-  genericName: string | null;
-  therapeuticClass: string | null;
-  actionClass: string | null;
-  chemicalClass: string | null;
-  habitForming: boolean;
-  uses: string[];
-  sideEffects: string[];
-}
+// Use the single shared Medicine type used by medicineService.
+// Keeping a second Medicine interface here caused incompatible
+// boolean vs boolean|null types across the assessment UI.
+export type { Medicine } from "./medicine";
 
 export interface PredictedADR {
   adr: string;
@@ -26,14 +19,14 @@ export interface PredictedADR {
 }
 
 export interface AssessmentResult {
-  medicine: Medicine;
+  medicine: import("./medicine").Medicine;
   documentedSideEffects: string[];
   predictedADRs: PredictedADR[];
   threshold: number;
 }
 
 export interface AlternativeMedicine {
-  medicine: Medicine;
+  medicine: import("./medicine").Medicine;
   similarity: number;
   reason: string;
 }

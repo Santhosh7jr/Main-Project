@@ -1,7 +1,4 @@
-import {
-  useEffect,
-  useState,
-} from "react";
+import { useState } from "react";
 
 import {
   useNavigate,
@@ -17,20 +14,15 @@ import {
   Pill,
   ShieldAlert,
   User,
-  Loader2,
 } from "lucide-react";
 
 import type {
   Patient,
 } from "../../types/patient";
 
-import {
-  getAssessmentReports,
-} from "../../services/reportService";
-
 import type {
-  ReportAssessment,
-} from "../../types/report";
+  PatientAssessmentHistory,
+} from "../../types/patient";
 
 interface PatientDetailsProps {
   patient: Patient;
@@ -52,55 +44,8 @@ function PatientDetails({
 }: PatientDetailsProps) {
   const navigate = useNavigate();
 
-  const [history, setHistory] =
-    useState<ReportAssessment[]>(
-      []
-    );
-
-  const [historyLoading, setHistoryLoading] =
-    useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadHistory = async () => {
-      try {
-        setHistoryLoading(true);
-
-        const reports =
-          await getAssessmentReports();
-
-        if (!cancelled) {
-          setHistory(
-            reports.filter(
-              (report) =>
-                report.patientId ===
-                patient.id
-            )
-          );
-        }
-      } catch (error) {
-        console.error(
-          "Failed to load patient assessment history:",
-          error
-        );
-
-        if (!cancelled) {
-          setHistory([]);
-        }
-      } finally {
-        if (!cancelled) {
-          setHistoryLoading(false);
-        }
-      }
-    };
-
-    loadHistory();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [patient.id]);
+  const history: PatientAssessmentHistory[] =
+    patient.assessmentHistory ?? [];
 
   const initials =
     patient.name
@@ -361,70 +306,18 @@ function PatientDetails({
               color="orange"
             />
 
-            {historyLoading ? (
-              <div className="flex items-center gap-2 py-6 text-sm text-slate-500">
-
-                <Loader2
-                  size={18}
-                  className="animate-spin"
-                />
-
-                Loading history...
-
-              </div>
-            ) : history.length ? (
-              <div className="space-y-3">
-
-                {history.map(
-                  (assessment) => (
-                    <button
-                      key={assessment.id}
-                      type="button"
-                      onClick={() =>
-                        navigate(
-                          `/reports?search=${encodeURIComponent(
-                            assessment.patientName
-                          )}`
-                        )
-                      }
-                      className="flex w-full items-center justify-between rounded-lg border border-slate-100 p-4 text-left hover:bg-slate-50"
-                    >
-
-                      <div>
-
-                        <p className="text-sm font-semibold text-slate-800">
-                          {
-                            assessment.medicineName
-                          }
-                        </p>
-
-                        <p className="mt-1 text-xs text-slate-400">
-                          {formatDate(
-                            assessment.createdAt
-                          )}
-                          {" • "}
-                          Assessment #
-                          {assessment.id}
-                        </p>
-
-                      </div>
-
-                      <span
-                        className={`rounded-full px-3 py-1 text-xs font-semibold ${riskClass[assessment.riskLevel]}`}
-                      >
-                        {
-                          assessment.riskLevel
-                        }
-                      </span>
-
-                    </button>
-                  )
-                )}
-
+            {history.length ? (
+              <div className="space-y-4">
+                {history.map((assessment) => (
+                  <AssessmentHistoryCard
+                    key={assessment.id}
+                    assessment={assessment}
+                  />
+                ))}
               </div>
             ) : (
               <EmptyState
-                text="No ADR assessments recorded for this patient."
+                text="No finalized ADR assessments recorded for this patient."
               />
             )}
 
@@ -533,6 +426,197 @@ function PatientDetails({
 
       </div>
 
+    </div>
+  );
+}
+
+
+function AssessmentHistoryCard({
+  assessment,
+}: {
+  assessment: PatientAssessmentHistory;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className="flex w-full items-center justify-between gap-4 p-4 text-left hover:bg-slate-50"
+      >
+        <div className="min-w-0">
+          <p className="text-sm font-bold text-slate-900">
+            {assessment.medicineName}
+          </p>
+
+          {assessment.genericName && (
+            <p className="mt-0.5 text-xs text-slate-500">
+              {assessment.genericName}
+            </p>
+          )}
+
+          <p className="mt-2 text-xs text-slate-400">
+            {formatDate(assessment.createdAt)}
+            {" • "}
+            Assessment #{assessment.id}
+          </p>
+        </div>
+
+        <span
+          className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${
+            riskClass[assessment.riskLevel]
+          }`}
+        >
+          {assessment.riskLevel}
+        </span>
+      </button>
+
+      {open && (
+        <div className="border-t border-slate-100 bg-slate-50 p-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <HistoryInfo
+              label="Patient at assessment"
+              value={`${assessment.patientAge} years • ${assessment.patientGender}`}
+            />
+
+            <HistoryInfo
+              label="Model confidence"
+              value={assessment.confidence.toFixed(3)}
+            />
+
+            <HistoryInfo
+              label="Therapeutic class"
+              value={
+                assessment.therapeuticClass ||
+                "Not available"
+              }
+            />
+
+            <HistoryInfo
+              label="Action class"
+              value={
+                assessment.actionClass ||
+                "Not available"
+              }
+            />
+
+            <HistoryInfo
+              label="Chemical class"
+              value={
+                assessment.chemicalClass ||
+                "Not available"
+              }
+            />
+
+            <HistoryInfo
+              label="Habit forming"
+              value={
+                assessment.habitForming
+                  ? "Yes"
+                  : "No"
+              }
+            />
+          </div>
+
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <HistoryList
+              label="Conditions at assessment"
+              values={assessment.patientConditions}
+            />
+
+            <HistoryList
+              label="Allergies at assessment"
+              values={assessment.patientAllergies}
+            />
+          </div>
+
+          <div className="mt-4 rounded-lg border border-orange-100 bg-white p-4">
+            <p className="text-xs font-bold uppercase tracking-wide text-orange-600">
+              Predicted adverse reactions
+            </p>
+
+            {assessment.predictions.length ? (
+              <div className="mt-3 space-y-2">
+                {assessment.predictions.map(
+                  (prediction, index) => (
+                    <div
+                      key={`${prediction.adr}-${index}`}
+                      className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2"
+                    >
+                      <span className="text-sm text-slate-700">
+                        {prediction.adr}
+                      </span>
+
+                      <span className="text-xs font-semibold text-slate-500">
+                        {prediction.score == null
+                          ? "N/A"
+                          : prediction.score.toFixed(3)}
+                      </span>
+                    </div>
+                  )
+                )}
+              </div>
+            ) : (
+              <p className="mt-2 text-sm text-slate-500">
+                No predicted ADRs were recorded.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function HistoryInfo({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-lg bg-white p-3">
+      <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+        {label}
+      </p>
+      <p className="mt-1 text-sm font-medium text-slate-700">
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function HistoryList({
+  label,
+  values,
+}: {
+  label: string;
+  values: string[];
+}) {
+  return (
+    <div className="rounded-lg bg-white p-3">
+      <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+        {label}
+      </p>
+
+      {values.length ? (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {values.map((value) => (
+            <span
+              key={value}
+              className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600"
+            >
+              {value}
+            </span>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-1 text-sm text-slate-500">
+          None recorded
+        </p>
+      )}
     </div>
   );
 }

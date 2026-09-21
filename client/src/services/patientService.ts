@@ -28,7 +28,7 @@ export const getPatientById = async (
 };
 
 export const createPatient = async (
-  patient: Omit<Patient, "id" | "createdAt">
+  patient: Omit<Patient, "id" | "createdAt" | "assessmentHistory">
 ): Promise<Patient> => {
   const response =
     await api.post<ApiResponse<Patient>>(

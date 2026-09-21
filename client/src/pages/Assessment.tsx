@@ -13,6 +13,7 @@ import PatientSafetyAlerts from "../components/assessment/PatientSafetyAlerts";
 import { getPatients } from "../services/patientService";
 import {
   runAssessment,
+  saveAssessment,
   type AssessmentResponse,
 } from "../services/assessmentService";
 import {
@@ -48,6 +49,9 @@ function Assessment() {
     useState(false);
 
   const [assessmentLoading, setAssessmentLoading] =
+    useState(false);
+
+  const [savingAssessment, setSavingAssessment] =
     useState(false);
 
   const [error, setError] = useState("");
@@ -185,8 +189,13 @@ function Assessment() {
   };
 
   // ==================================================
-  // RUN ASSESSMENT
+  // RUN PREVIEW
   // ==================================================
+  //
+  // IMPORTANT:
+  // This only evaluates the selected medicine.
+  // Nothing is inserted into assessments here.
+  //
 
   const handleRunAssessment = async () => {
     if (!selectedPatient) {
@@ -219,9 +228,7 @@ function Assessment() {
 
       try {
         const alternativesResult =
-          await getAlternatives(
-            selectedMedicine.id
-          );
+          await getAlternatives(selectedMedicine.id);
 
         setAlternatives(
           alternativesResult.alternatives
@@ -237,10 +244,7 @@ function Assessment() {
         );
       }
     } catch (err) {
-      console.error(
-        "Assessment failed:",
-        err
-      );
+      console.error("Assessment failed:", err);
 
       setError(
         err instanceof Error
@@ -249,6 +253,128 @@ function Assessment() {
       );
     } finally {
       setAssessmentLoading(false);
+    }
+  };
+
+  // ==================================================
+  // PREVIEW AN ALTERNATIVE
+  // ==================================================
+  //
+  // The alternative is NOT saved. We first run the same
+  // preview against that medicine so the doctor can review
+  // its ADRs and safety information.
+  //
+
+  const handleAlternativeSelect = async (
+    medicineId: number
+  ) => {
+    if (!selectedPatient) {
+      return;
+    }
+
+    try {
+      setAssessmentLoading(true);
+      setError("");
+      setAlternativeWarning("");
+
+      const medicine =
+        await getMedicineById(medicineId);
+
+      setSelectedMedicine(medicine);
+
+      const result = await runAssessment(
+        selectedPatient.id,
+        medicineId
+      );
+
+      setAssessmentData(result);
+
+      try {
+        const alternativesResult =
+          await getAlternatives(medicineId);
+
+        setAlternatives(
+          alternativesResult.alternatives
+        );
+      } catch {
+        setAlternatives([]);
+        setAlternativeWarning(
+          "The medicine was evaluated, but alternative medicines could not be loaded."
+        );
+      }
+
+      window.scrollTo({
+        top: 0,
+        behavior: "smooth",
+      });
+    } catch (err) {
+      console.error(
+        "Alternative assessment failed:",
+        err
+      );
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to evaluate the selected alternative."
+      );
+    } finally {
+      setAssessmentLoading(false);
+    }
+  };
+
+  // ==================================================
+  // FINALIZE / SAVE SELECTED MEDICINE
+  // ==================================================
+  //
+  // This is the ONLY place where the doctor creates
+  // an assessment history record.
+  //
+
+  const handleSaveAssessment = async () => {
+    if (!selectedPatient || !selectedMedicine) {
+      setError(
+        "Please select a patient and medicine first."
+      );
+      return;
+    }
+
+    try {
+      setSavingAssessment(true);
+      setError("");
+
+      const saved = await saveAssessment(
+        selectedPatient.id,
+        selectedMedicine.id
+      );
+
+      setAssessmentData(saved);
+
+      // Refresh the alternatives after the final save.
+      // They remain suggestions only; they are not stored.
+      try {
+        const alternativesResult =
+          await getAlternatives(selectedMedicine.id);
+
+        setAlternatives(
+          alternativesResult.alternatives
+        );
+      } catch {
+        // The assessment itself is already saved.
+      }
+    } catch (err) {
+      console.error(
+        "Failed to save assessment:",
+        err
+      );
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to save the selected medicine."
+      );
+    } finally {
+      setSavingAssessment(false);
     }
   };
 
@@ -285,13 +411,21 @@ function Assessment() {
             </div>
 
             {assessmentData && (
-              <div className="flex-shrink-0 rounded-xl border border-slate-200 bg-slate-50 px-5 py-4">
+              <div className={`flex-shrink-0 rounded-xl border px-5 py-4 ${
+                assessmentData.assessmentId
+                  ? "border-green-200 bg-green-50"
+                  : "border-amber-200 bg-amber-50"
+              }`}>
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Assessment ID
+                  {assessmentData.assessmentId
+                    ? "Saved Assessment"
+                    : "Assessment Preview"}
                 </p>
 
-                <p className="mt-1 text-2xl font-bold text-slate-900">
-                  #{assessmentData.assessmentId}
+                <p className="mt-1 text-lg font-bold text-slate-900">
+                  {assessmentData.assessmentId
+                    ? `#${assessmentData.assessmentId}`
+                    : "Not saved yet"}
                 </p>
               </div>
             )}
@@ -495,7 +629,8 @@ function Assessment() {
                 !selectedPatient ||
                 !selectedMedicine ||
                 loadingMedicineDetails ||
-                assessmentLoading
+                assessmentLoading ||
+                savingAssessment
               }
               className="inline-flex min-h-12 items-center justify-center rounded-xl bg-blue-600 px-7 text-base font-bold text-white shadow-sm transition hover:bg-blue-700 hover:shadow-md disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 disabled:shadow-none"
             >
@@ -729,26 +864,70 @@ function Assessment() {
 
               <Alternatives
                 alternatives={alternatives}
+                onSelectAlternative={
+                  handleAlternativeSelect
+                }
               />
 
             </div>
 
-            {/* TIMESTAMP */}
+            {/* FINAL SAVE */}
 
-            <div className="flex flex-col gap-1 rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+            {!assessmentData.assessmentId ? (
+              <div className="rounded-2xl border border-green-200 bg-green-50 p-6">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h3 className="text-lg font-bold text-green-900">
+                      Medicine selection
+                    </h3>
 
-              <p className="text-sm font-semibold text-slate-600">
-                Assessment #{assessmentData.assessmentId}
-              </p>
+                    <p className="mt-1 max-w-2xl text-sm leading-6 text-green-800">
+                      This result is only a preview. Nothing has
+                      been added to the patient's history yet.
+                      Save it only when you have selected{" "}
+                      <span className="font-bold">
+                        {assessmentData.medicine.name}
+                      </span>{" "}
+                      for this patient.
+                    </p>
+                  </div>
 
-              <p className="text-sm text-slate-500">
-                Created{" "}
-                {new Date(
-                  assessmentData.createdAt
-                ).toLocaleString()}
-              </p>
+                  <button
+                    type="button"
+                    onClick={handleSaveAssessment}
+                    disabled={savingAssessment}
+                    className="inline-flex min-h-12 shrink-0 items-center justify-center rounded-xl bg-green-600 px-6 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                  >
+                    {savingAssessment ? (
+                      <>
+                        <Loader2
+                          size={18}
+                          className="mr-2 animate-spin"
+                        />
+                        Saving...
+                      </>
+                    ) : (
+                      "Select & Save Medicine"
+                    )}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-1 rounded-xl border border-green-200 bg-green-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm font-semibold text-green-800">
+                  Assessment #{assessmentData.assessmentId} saved to patient history.
+                </p>
 
-            </div>
+                {assessmentData.createdAt && (
+                  <p className="text-sm text-green-700">
+                    Saved{" "}
+                    {new Date(
+                      assessmentData.createdAt
+                    ).toLocaleString()}
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* DISCLAIMER */}
 

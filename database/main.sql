@@ -194,6 +194,11 @@ CREATE TABLE IF NOT EXISTS assessments (
     risk_level VARCHAR(20),
 
     confidence DECIMAL(7,6),
+    patient_name_snapshot VARCHAR(150),
+    patient_age_snapshot INTEGER,
+    patient_gender_snapshot VARCHAR(20),
+    patient_conditions_snapshot JSONB NOT NULL DEFAULT '[]'::jsonb,
+    patient_allergies_snapshot JSONB NOT NULL DEFAULT '[]'::jsonb,
 
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -335,6 +340,28 @@ ON assessment_alternatives(assessment_id);
 
 CREATE INDEX IF NOT EXISTS idx_assessment_alternatives_medicine_id
 ON assessment_alternatives(medicine_id);
+
+
+-- ============================================================
+-- ASSESSMENT HISTORY SNAPSHOTS
+-- ============================================================
+-- Safe to run on an existing database.
+ALTER TABLE assessments
+ADD COLUMN IF NOT EXISTS patient_name_snapshot VARCHAR(150);
+
+ALTER TABLE assessments
+ADD COLUMN IF NOT EXISTS patient_age_snapshot INTEGER;
+
+ALTER TABLE assessments
+ADD COLUMN IF NOT EXISTS patient_gender_snapshot VARCHAR(20);
+
+ALTER TABLE assessments
+ADD COLUMN IF NOT EXISTS patient_conditions_snapshot JSONB
+NOT NULL DEFAULT '[]'::jsonb;
+
+ALTER TABLE assessments
+ADD COLUMN IF NOT EXISTS patient_allergies_snapshot JSONB
+NOT NULL DEFAULT '[]'::jsonb;
 
 
 SELECT column_name
